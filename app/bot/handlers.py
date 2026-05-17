@@ -17,6 +17,7 @@ from app.nlp.parser import parse
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
+MAX_INPUT_CHARS = 500
 
 
 def _service(context: ContextTypes.DEFAULT_TYPE) -> FlightService:
@@ -54,6 +55,9 @@ async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = _command_payload(update)
     if not user or not text:
         await update.message.reply_text(messages.WATCH_HINT, parse_mode=ParseMode.MARKDOWN)
+        return
+    if _input_too_long(text):
+        await update.message.reply_text(messages.INPUT_TOO_LONG)
         return
 
     await upsert_user(user.id, user.username, user.full_name, user.language_code)
@@ -173,6 +177,9 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (update.message.text or "").strip()
     if not text:
         return
+    if _input_too_long(text):
+        await update.message.reply_text(messages.INPUT_TOO_LONG)
+        return
     q = parse(text)
     if q.intent != "search_cheapest" or not (q.origin and q.destination and q.departure_date):
         await update.message.reply_text(messages.PARSE_HINT, parse_mode=ParseMode.MARKDOWN)
@@ -226,6 +233,10 @@ def _parse_int(value: str) -> int | None:
         return int(value)
     except ValueError:
         return None
+
+
+def _input_too_long(text: str) -> bool:
+    return len(text) > MAX_INPUT_CHARS
 
 
 async def _check_rate_limit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:

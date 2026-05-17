@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from app.bot.handlers import parse_duration
+from app.bot.handlers import _input_too_long, parse_duration
 
 
 def test_parse_duration_accepts_hours_and_days():
@@ -12,3 +12,8 @@ def test_parse_duration_rejects_invalid_values():
     assert parse_duration("0h") is None
     assert parse_duration("1w") is None
     assert parse_duration("abc") is None
+
+
+def test_input_too_long_matches_spec_limit():
+    assert _input_too_long("x" * 500) is False
+    assert _input_too_long("x" * 501) is True

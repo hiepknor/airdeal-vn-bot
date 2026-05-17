@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.alerts.models import Alert
 from app.flights.models import FlightOffer
 from app.nlp.parser import ParsedQuery
+from app.utils.affiliate import safe_booking_url
 
 WELCOME = (
     "✈️ Chào! Mình là AirDeal VN Bot, săn vé nội địa giá rẻ.\n\n"
@@ -35,6 +36,8 @@ NO_RESULTS = "Không tìm thấy chuyến phù hợp. Thử ngày/route khác gi
 PROVIDER_FAIL = "Hệ thống đang quá tải. Thử lại sau ít phút."
 
 RATE_LIMITED = "Bạn thao tác hơi nhanh. Chờ một chút rồi thử lại nhé."
+
+INPUT_TOO_LONG = "Tin nhắn quá dài. Vui lòng nhập tối đa 500 ký tự."
 
 WATCH_HINT = (
     "Dùng: `/watch <điểm đi> đi <điểm đến> <ngày> dưới <giá>`\n"
@@ -71,10 +74,12 @@ def format_offers(offers: list[FlightOffer]) -> str:
         time = ""
         if o.depart_time and o.arrive_time:
             time = f"  {o.depart_time} → {o.arrive_time}"
+        booking_url = safe_booking_url(o.booking_url)
+        booking_line = f"   🔗 [Đặt vé]({booking_url})" if booking_url else "   🔗 Chưa có link đặt vé an toàn"
         lines.append(
             f"{medal} *{o.airline}* {o.flight_number or ''}{time}\n"
             f"   {_vnd(o.price_per_person)}/người · Tổng {_vnd(o.total_price)}\n"
-            f"   🔗 [Đặt vé]({o.booking_url or '#'})"
+            f"{booking_line}"
         )
     return "\n\n".join(lines)
 
@@ -105,11 +110,13 @@ def format_alert_offer(offer: FlightOffer) -> str:
     time = ""
     if offer.depart_time and offer.arrive_time:
         time = f" {offer.depart_time} → {offer.arrive_time}"
+    booking_url = safe_booking_url(offer.booking_url)
+    booking_line = f"🔗 [Đặt vé]({booking_url})" if booking_url else "🔗 Chưa có link đặt vé an toàn"
     return (
         f"🔔 *Có vé hợp alert:* `{offer.origin} → {offer.destination}`\n"
         f"*{offer.airline}* {offer.flight_number or ''}{time}\n"
         f"{_vnd(offer.price_per_person)}/người · Tổng {_vnd(offer.total_price)}\n"
-        f"🔗 [Đặt vé]({offer.booking_url or '#'})"
+        f"{booking_line}"
     )
 
 
