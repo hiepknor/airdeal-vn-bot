@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.alerts.models import Alert
 from app.flights.models import FlightOffer
 from app.nlp.parser import ParsedQuery
 
@@ -33,11 +34,22 @@ NO_RESULTS = "Không tìm thấy chuyến phù hợp. Thử ngày/route khác gi
 
 PROVIDER_FAIL = "Hệ thống đang quá tải. Thử lại sau ít phút."
 
+WATCH_HINT = (
+    "Dùng: `/watch <điểm đi> đi <điểm đến> <ngày> dưới <giá>`\n"
+    "Ví dụ: `/watch hà nội đi sài gòn 20/5 dưới 1.2tr`"
+)
+
+ALERT_NOT_FOUND = "Alert không tồn tại hoặc không thuộc tài khoản của bạn."
+
+ALERT_LIMIT = "Bạn đã đạt giới hạn 10 alert active. Xoá bớt trước khi tạo alert mới."
+
+ALERT_PRICE_INVALID = "Giá theo dõi phải từ 100.000đ đến 50.000.000đ/người."
+
 
 def format_parsed(q: ParsedQuery) -> str:
     pax = q.passengers
     parts = [
-        f"🔎 *Tìm chuyến:*",
+        "🔎 *Tìm chuyến:*",
         f"• Tuyến: `{q.origin} → {q.destination}`",
         f"• Ngày đi: `{q.departure_date}`",
     ]
@@ -63,6 +75,40 @@ def format_offers(offers: list[FlightOffer]) -> str:
             f"   🔗 [Đặt vé]({o.booking_url or '#'})"
         )
     return "\n\n".join(lines)
+
+
+def format_watch_confirm(alert: Alert) -> str:
+    return (
+        f"✅ Đã tạo alert #{alert.id}\n"
+        f"• Tuyến: `{alert.origin} → {alert.destination}`\n"
+        f"• Ngày đi: `{alert.departure_date}`\n"
+        f"• Giá tối đa: {_vnd(alert.max_price_per_person)}/người"
+    )
+
+
+def format_alerts(alerts: list[Alert]) -> str:
+    if not alerts:
+        return "Bạn chưa có alert active nào."
+    lines = ["*Alert đang theo dõi:*"]
+    for alert in alerts[:20]:
+        paused = " · đang tạm dừng" if alert.paused_until else ""
+        lines.append(
+            f"#{alert.id} `{alert.origin} → {alert.destination}` "
+            f"{alert.departure_date} · dưới {_vnd(alert.max_price_per_person)}{paused}"
+        )
+    return "\n".join(lines)
+
+
+def format_alert_offer(offer: FlightOffer) -> str:
+    time = ""
+    if offer.depart_time and offer.arrive_time:
+        time = f" {offer.depart_time} → {offer.arrive_time}"
+    return (
+        f"🔔 *Có vé hợp alert:* `{offer.origin} → {offer.destination}`\n"
+        f"*{offer.airline}* {offer.flight_number or ''}{time}\n"
+        f"{_vnd(offer.price_per_person)}/người · Tổng {_vnd(offer.total_price)}\n"
+        f"🔗 [Đặt vé]({offer.booking_url or '#'})"
+    )
 
 
 def _vnd(n: int) -> str:

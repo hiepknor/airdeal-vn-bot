@@ -1,8 +1,27 @@
 from __future__ import annotations
 
-from telegram.ext import Application, ApplicationBuilder, CommandHandler, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
 
-from app.bot.handlers import cmd_help, cmd_start, on_text
+from app.alerts.notifier import TelegramAlertNotifier
+from app.alerts.scheduler import AlertScheduler
+from app.alerts.service import AlertService
+from app.bot.handlers import (
+    cmd_alerts,
+    cmd_delete,
+    cmd_help,
+    cmd_pause,
+    cmd_start,
+    cmd_watch,
+    on_alert_callback,
+    on_text,
+)
 from app.config import settings
 from app.flights.cache import SearchCache
 from app.flights.providers.base import FlightProvider
@@ -41,16 +60,43 @@ def _build_providers() -> list[FlightProvider]:
     return providers
 
 
+async def _post_init(application: Application) -> None:
+    scheduler = application.bot_data["alert_scheduler"]
+    scheduler.start()
+
+
+async def _post_shutdown(application: Application) -> None:
+    scheduler = application.bot_data.get("alert_scheduler")
+    if scheduler:
+        scheduler.shutdown()
+
+
 def build_app() -> Application:
-    application = ApplicationBuilder().token(settings.telegram_bot_token).build()
-    application.bot_data["flight_service"] = FlightService(
+    application = (
+        ApplicationBuilder()
+        .token(settings.telegram_bot_token)
+        .post_init(_post_init)
+        .post_shutdown(_post_shutdown)
+        .build()
+    )
+    flight_service = FlightService(
         _build_providers(),
         cache=SearchCache(),
     )
+    alert_service = AlertService()
+    notifier = TelegramAlertNotifier(application.bot)
+    application.bot_data["flight_service"] = flight_service
+    application.bot_data["alert_service"] = alert_service
+    application.bot_data["alert_scheduler"] = AlertScheduler(alert_service, flight_service, notifier)
 
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(CommandHandler("help", cmd_help))
     application.add_handler(CommandHandler("search", on_text))
+    application.add_handler(CommandHandler("watch", cmd_watch))
+    application.add_handler(CommandHandler("alerts", cmd_alerts))
+    application.add_handler(CommandHandler("pause", cmd_pause))
+    application.add_handler(CommandHandler("delete", cmd_delete))
+    application.add_handler(CallbackQueryHandler(on_alert_callback, pattern=r"^(pause|delete):"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
     return application
