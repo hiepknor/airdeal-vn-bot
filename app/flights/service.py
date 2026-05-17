@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.flights.cache import SearchCache
 from app.flights.models import FlightOffer, PassengerCount
 from app.flights.providers.base import AllProvidersFailed, FlightProvider
 from app.utils.logging import get_logger
@@ -12,10 +13,11 @@ _PROVIDER_TIMEOUT_S = 8
 
 
 class FlightService:
-    def __init__(self, providers: list[FlightProvider]) -> None:
+    def __init__(self, providers: list[FlightProvider], cache: SearchCache | None = None) -> None:
         if not providers:
             raise ValueError("at least one provider required")
         self.providers = providers
+        self.cache = cache
 
     async def search(
         self,
@@ -25,6 +27,11 @@ class FlightService:
         passengers: PassengerCount,
         return_date: str | None = None,
     ) -> list[FlightOffer]:
+        if self.cache is not None:
+            cached = await self.cache.get(origin, destination, departure_date, passengers, return_date)
+            if cached is not None:
+                return cached
+
         results = await asyncio.gather(
             *(
                 self._call(p, origin, destination, departure_date, passengers, return_date)
@@ -35,7 +42,7 @@ class FlightService:
         merged: dict[str, FlightOffer] = {}
         any_ok = False
         for r in results:
-            if isinstance(r, Exception):
+            if isinstance(r, BaseException):
                 continue
             any_ok = True
             for offer in r:
@@ -44,7 +51,10 @@ class FlightService:
                     merged[offer.flight_key] = offer
         if not any_ok:
             raise AllProvidersFailed("all providers failed")
-        return sorted(merged.values(), key=lambda o: o.price_per_person)
+        offers = sorted(merged.values(), key=lambda o: o.price_per_person)
+        if self.cache is not None:
+            await self.cache.set(origin, destination, departure_date, passengers, offers, return_date)
+        return offers
 
     async def _call(
         self,
