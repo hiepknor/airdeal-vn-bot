@@ -39,6 +39,8 @@ PROVIDER_FAIL = "Hệ thống đang quá tải. Thử lại sau ít phút."
 
 RATE_LIMITED = "Bạn thao tác hơi nhanh. Chờ một chút rồi thử lại nhé."
 
+OWNER_ONLY = "Bot đang ở chế độ riêng tư. Tài khoản này không được phép sử dụng."
+
 INPUT_TOO_LONG = "Tin nhắn quá dài. Vui lòng nhập tối đa 500 ký tự."
 
 WATCH_HINT = (

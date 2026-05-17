@@ -36,7 +36,7 @@ def _rate_limiter(context: ContextTypes.DEFAULT_TYPE) -> TokenBucketRateLimiter:
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     if user:
@@ -46,13 +46,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     await update.message.reply_text(messages.HELP, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     text = _command_payload(update)
@@ -95,7 +95,7 @@ async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     if not user:
@@ -117,7 +117,7 @@ async def cmd_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_deals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     deals = await recent_great_deals(user.id if user else None)
@@ -129,7 +129,7 @@ async def cmd_deals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     text = _command_payload(update)
     if not text:
@@ -147,7 +147,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     if not user or len(context.args) < 2:
@@ -163,7 +163,7 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     user = update.effective_user
     if not user or not context.args:
@@ -178,7 +178,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def on_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     query = update.callback_query
     user = update.effective_user
@@ -205,7 +205,7 @@ async def on_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _check_rate_limit(update, context):
+    if not await _check_access(update, context):
         return
     text = (update.message.text or "").strip()
     if not text:
@@ -277,6 +277,22 @@ def _parse_route(text: str) -> tuple[str, str] | None:
 
 def _input_too_long(text: str) -> bool:
     return len(text) > MAX_INPUT_CHARS
+
+
+def _owner_allowed(user_id: int | None, owner_chat_id: int | None) -> bool:
+    return owner_chat_id is None or user_id == owner_chat_id
+
+
+async def _check_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    user = update.effective_user
+    owner_chat_id = context.application.bot_data.get("owner_chat_id")
+    if not _owner_allowed(user.id if user else None, owner_chat_id):
+        if update.callback_query:
+            await update.callback_query.answer(messages.OWNER_ONLY, show_alert=False)
+        elif update.message:
+            await update.message.reply_text(messages.OWNER_ONLY)
+        return False
+    return await _check_rate_limit(update, context)
 
 
 async def _check_rate_limit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
