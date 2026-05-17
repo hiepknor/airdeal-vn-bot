@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 
+import uvicorn
+
+from app.api import create_api
 from app.bot.middleware.webhook_auth import normalize_webhook_secret
 from app.bot.telegram_bot import build_app
 from app.config import settings
@@ -26,6 +30,19 @@ def _webhook_config() -> tuple[str, str]:
     return settings.telegram_webhook_url, secret
 
 
+def _start_health_server() -> uvicorn.Server:
+    config = uvicorn.Config(
+        create_api(),
+        host="0.0.0.0",  # noqa: S104 - container health endpoint
+        port=settings.http_port,
+        log_level=settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, name="health-server", daemon=True)
+    thread.start()
+    return server
+
+
 def main() -> None:
     asyncio.run(_startup())
     app = build_app()
@@ -38,6 +55,7 @@ def main() -> None:
             secret_token=webhook_secret,
         )
     else:
+        _start_health_server()
         app.run_polling()
 
 
