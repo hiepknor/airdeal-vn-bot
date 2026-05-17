@@ -6,6 +6,7 @@ from typing import Protocol
 from app.alerts.models import Alert
 from app.config import settings
 from app.db.database import connect
+from app.deals.scoring import baseline, score_offer
 from app.flights.models import FlightOffer, PassengerCount
 from app.utils.logging import get_logger
 
@@ -166,6 +167,10 @@ class AlertService:
             return True
 
         if await self._price_drop_pct(offer) >= 5:
+            return True
+
+        stats = await baseline(offer.origin, offer.destination, offer.departure_date)
+        if score_offer(offer, stats).is_great_deal:
             return True
 
         return False

@@ -205,3 +205,33 @@ async def test_price_drop_alerts_even_above_max_price(alert_service: AlertServic
     await alert_service.record_snapshot(_offer(1_200_000), created_at=yesterday)
 
     assert await alert_service.should_alert(alert, _offer(1_100_000)) is True
+
+
+@pytest.mark.asyncio
+async def test_should_alert_for_great_deal_even_above_max_price(alert_service: AlertService):
+    alert = await alert_service.create_or_update_alert(
+        telegram_id=12345,
+        origin="HAN",
+        destination="SGN",
+        departure_date="2026-05-20",
+        return_date=None,
+        passengers=PassengerCount(),
+        max_price_per_person=500_000,
+    )
+    for index, price in enumerate(
+        [
+            800_000,
+            900_000,
+            1_000_000,
+            1_100_000,
+            1_200_000,
+            1_300_000,
+            1_400_000,
+            1_500_000,
+            1_600_000,
+            1_700_000,
+        ]
+    ):
+        await alert_service.record_snapshot(_offer(price, f"baseline-{index}"))
+
+    assert await alert_service.should_alert(alert, _offer(850_000, "great-deal")) is True
