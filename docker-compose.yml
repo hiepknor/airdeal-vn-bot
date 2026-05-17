@@ -1,5 +1,5 @@
 services:
-  airdeal-bot:
+  airdeal-vn-bot:
     build: .
     container_name: airdeal-vn-bot
     restart: unless-stopped
