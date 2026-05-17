@@ -44,7 +44,9 @@ def _start_health_server() -> uvicorn.Server:
 
 
 def main() -> None:
-    asyncio.run(_startup())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_startup())
     app = build_app()
     if settings.telegram_mode == "webhook":
         webhook_url, webhook_secret = _webhook_config()
