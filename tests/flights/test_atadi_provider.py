@@ -1,11 +1,10 @@
+import httpx
 import pytest
 import respx
-import httpx
 
 from app.flights.models import PassengerCount
 from app.flights.providers.atadi import AtadiProvider
 from app.flights.providers.base import ProviderError
-
 
 MOCK_RESPONSE = {
     "data": [

@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import asyncio
 import re
-from functools import lru_cache
+from functools import cache
 
-from fast_flights import Airport, FlightData, Passengers, create_filter, get_flights
+from fast_flights import Airport, FlightData, Passengers, get_flights
 from fast_flights.schema import Flight as FFLight
 
 from app.flights.models import FlightOffer, PassengerCount
@@ -25,7 +25,7 @@ from app.utils.logging import get_logger
 log = get_logger(__name__)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _iata_to_airport() -> dict[str, Airport]:
     return {a.value: a for a in Airport}
 

@@ -9,7 +9,7 @@ class PassengerCount(BaseModel):
     infants: int = Field(0, ge=0, le=8)
 
     @model_validator(mode="after")
-    def _infants_le_adults(self) -> "PassengerCount":
+    def _infants_le_adults(self) -> PassengerCount:
         if self.infants > self.adults:
             raise ValueError("infants cannot exceed adults")
         if self.adults + self.children + self.infants > 9:

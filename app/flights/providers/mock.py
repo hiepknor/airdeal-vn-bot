@@ -25,7 +25,7 @@ class MockProvider(FlightProvider):
         passengers: PassengerCount,
         return_date: str | None = None,
     ) -> list[FlightOffer]:
-        rng = random.Random(f"{origin}{destination}{departure_date}")
+        rng = random.Random(f"{origin}{destination}{departure_date}")  # noqa: S311
         offers: list[FlightOffer] = []
         for code, name in self._AIRLINES:
             flight_no = f"{code}{rng.randint(100, 999)}"

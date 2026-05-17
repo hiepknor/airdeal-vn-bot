@@ -13,4 +13,4 @@ def make_flight_key(
         departure_date,
         (depart_time or "").strip(),
     ]
-    return sha1("|".join(parts).encode("utf-8")).hexdigest()
+    return sha1("|".join(parts).encode("utf-8"), usedforsecurity=False).hexdigest()

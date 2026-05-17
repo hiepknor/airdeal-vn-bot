@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import re
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from app.flights.models import FlightOffer, PassengerCount
-from app.flights.providers.base import FlightProvider, ProviderError, ProviderTimeout
+from app.flights.providers.base import FlightProvider, ProviderTimeout
 from app.utils.affiliate import inject_affiliate
 from app.utils.flight_key import make_flight_key
 from app.utils.logging import get_logger
@@ -82,7 +82,7 @@ class AtadiPlaywrightProvider(FlightProvider):
                 self._scrape(url, origin, destination, departure_date, passengers, return_date),
                 timeout=35,
             )
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise ProviderTimeout("atadi_web timeout") from e
 
     async def _scrape(
