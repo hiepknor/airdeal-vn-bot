@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.bot.middleware.webhook_auth import normalize_webhook_secret
 from app.bot.telegram_bot import build_app
 from app.config import settings
 from app.db.database import init_db
@@ -15,17 +16,26 @@ async def _startup() -> None:
     await init_db()
 
 
+def _webhook_config() -> tuple[str, str]:
+    if not settings.telegram_webhook_url:
+        raise RuntimeError("TELEGRAM_WEBHOOK_URL required in webhook mode")
+    try:
+        secret = normalize_webhook_secret(settings.telegram_webhook_secret)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+    return settings.telegram_webhook_url, secret
+
+
 def main() -> None:
     asyncio.run(_startup())
     app = build_app()
     if settings.telegram_mode == "webhook":
-        if not settings.telegram_webhook_url:
-            raise RuntimeError("TELEGRAM_WEBHOOK_URL required in webhook mode")
+        webhook_url, webhook_secret = _webhook_config()
         app.run_webhook(
-            listen="0.0.0.0",
+            listen="0.0.0.0",  # noqa: S104 - container webhook listener
             port=settings.http_port,
-            webhook_url=settings.telegram_webhook_url,
-            secret_token=settings.telegram_webhook_secret,
+            webhook_url=webhook_url,
+            secret_token=webhook_secret,
         )
     else:
         app.run_polling()
