@@ -11,9 +11,11 @@ from app.alerts.service import AlertLimitReached, AlertService
 from app.bot import messages
 from app.bot.middleware.rate_limit import TokenBucketRateLimiter
 from app.db.database import upsert_user
+from app.deals.history import route_price_history
 from app.deals.scoring import recent_great_deals
 from app.flights.providers.base import AllProvidersFailed
 from app.flights.service import FlightService
+from app.nlp.airport_aliases import find_airports
 from app.nlp.parser import parse
 from app.utils.logging import get_logger
 
@@ -124,6 +126,24 @@ async def cmd_deals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )
+
+
+async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
+    text = _command_payload(update)
+    if not text:
+        await update.message.reply_text(messages.HISTORY_HINT, parse_mode=ParseMode.MARKDOWN)
+        return
+    if _input_too_long(text):
+        await update.message.reply_text(messages.INPUT_TOO_LONG)
+        return
+    route = _parse_route(text)
+    if route is None:
+        await update.message.reply_text(messages.HISTORY_HINT, parse_mode=ParseMode.MARKDOWN)
+        return
+    history = await route_price_history(route[0], route[1])
+    await update.message.reply_text(messages.format_history(history), parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -246,6 +266,13 @@ def _parse_int(value: str) -> int | None:
         return int(value)
     except ValueError:
         return None
+
+
+def _parse_route(text: str) -> tuple[str, str] | None:
+    airports = find_airports(text)
+    if len(airports) < 2:
+        return None
+    return (airports[0][2], airports[1][2])
 
 
 def _input_too_long(text: str) -> bool:
