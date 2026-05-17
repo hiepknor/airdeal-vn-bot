@@ -34,6 +34,8 @@ NO_RESULTS = "Không tìm thấy chuyến phù hợp. Thử ngày/route khác gi
 
 PROVIDER_FAIL = "Hệ thống đang quá tải. Thử lại sau ít phút."
 
+RATE_LIMITED = "Bạn thao tác hơi nhanh. Chờ một chút rồi thử lại nhé."
+
 WATCH_HINT = (
     "Dùng: `/watch <điểm đi> đi <điểm đến> <ngày> dưới <giá>`\n"
     "Ví dụ: `/watch hà nội đi sài gòn 20/5 dưới 1.2tr`"

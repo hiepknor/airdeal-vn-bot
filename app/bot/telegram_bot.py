@@ -22,6 +22,7 @@ from app.bot.handlers import (
     on_alert_callback,
     on_text,
 )
+from app.bot.middleware.rate_limit import TokenBucketRateLimiter
 from app.config import settings
 from app.flights.cache import SearchCache
 from app.flights.providers.base import FlightProvider
@@ -87,6 +88,7 @@ def build_app() -> Application:
     notifier = TelegramAlertNotifier(application.bot)
     application.bot_data["flight_service"] = flight_service
     application.bot_data["alert_service"] = alert_service
+    application.bot_data["rate_limiter"] = TokenBucketRateLimiter(settings.rate_limit_per_minute)
     application.bot_data["alert_scheduler"] = AlertScheduler(alert_service, flight_service, notifier)
 
     application.add_handler(CommandHandler("start", cmd_start))

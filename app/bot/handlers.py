@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 
 from app.alerts.service import AlertLimitReached, AlertService
 from app.bot import messages
+from app.bot.middleware.rate_limit import TokenBucketRateLimiter
 from app.db.database import upsert_user
 from app.flights.providers.base import AllProvidersFailed
 from app.flights.service import FlightService
@@ -26,7 +27,13 @@ def _alert_service(context: ContextTypes.DEFAULT_TYPE) -> AlertService:
     return context.application.bot_data["alert_service"]
 
 
+def _rate_limiter(context: ContextTypes.DEFAULT_TYPE) -> TokenBucketRateLimiter:
+    return context.application.bot_data["rate_limiter"]
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     user = update.effective_user
     if user:
         await upsert_user(user.id, user.username, user.full_name, user.language_code)
@@ -35,10 +42,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     await update.message.reply_text(messages.HELP, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     user = update.effective_user
     text = _command_payload(update)
     if not user or not text:
@@ -77,6 +88,8 @@ async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     user = update.effective_user
     if not user:
         return
@@ -97,6 +110,8 @@ async def cmd_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     user = update.effective_user
     if not user or len(context.args) < 2:
         await update.message.reply_text("Dùng: `/pause <id> <1h|1d|7d>`", parse_mode=ParseMode.MARKDOWN)
@@ -111,6 +126,8 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     user = update.effective_user
     if not user or not context.args:
         await update.message.reply_text("Dùng: `/delete <id>`", parse_mode=ParseMode.MARKDOWN)
@@ -124,6 +141,8 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def on_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     query = update.callback_query
     user = update.effective_user
     if not query or not user or not query.data:
@@ -149,6 +168,8 @@ async def on_alert_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
     text = (update.message.text or "").strip()
     if not text:
         return
@@ -205,3 +226,17 @@ def _parse_int(value: str) -> int | None:
         return int(value)
     except ValueError:
         return None
+
+
+async def _check_rate_limit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    user = update.effective_user
+    if user is None:
+        return True
+    if _rate_limiter(context).allow(user.id):
+        return True
+    if update.callback_query:
+        await update.callback_query.answer(messages.RATE_LIMITED, show_alert=False)
+        return False
+    if update.message:
+        await update.message.reply_text(messages.RATE_LIMITED)
+    return False
