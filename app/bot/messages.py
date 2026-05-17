@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.alerts.models import Alert
+from app.deals.scoring import ScoredOffer
 from app.flights.models import FlightOffer
 from app.nlp.parser import ParsedQuery
 from app.utils.affiliate import safe_booking_url
@@ -49,6 +50,8 @@ ALERT_NOT_FOUND = "Alert không tồn tại hoặc không thuộc tài khoản c
 ALERT_LIMIT = "Bạn đã đạt giới hạn 10 alert active. Xoá bớt trước khi tạo alert mới."
 
 ALERT_PRICE_INVALID = "Giá theo dõi phải từ 100.000đ đến 50.000.000đ/người."
+
+NO_DEALS = "Chưa đủ dữ liệu deal tốt trong 24h qua. Quay lại sau nhé."
 
 
 def format_parsed(q: ParsedQuery) -> str:
@@ -104,6 +107,31 @@ def format_alerts(alerts: list[Alert]) -> str:
             f"{alert.departure_date} · dưới {_vnd(alert.max_price_per_person)}{paused}"
         )
     return "\n".join(lines)
+
+
+def format_deals(deals: list[ScoredOffer]) -> str:
+    if not deals:
+        return NO_DEALS
+    medals = ["🥇", "🥈", "🥉", "•", "•"]
+    lines = ["*Top deal 24h qua:*"]
+    for index, scored in enumerate(deals[:5]):
+        offer = scored.offer
+        medal = medals[index] if index < len(medals) else "•"
+        time = ""
+        if offer.depart_time and offer.arrive_time:
+            time = f" {offer.depart_time} → {offer.arrive_time}"
+        savings = ""
+        if scored.median_savings_pct is not None:
+            savings = f" · rẻ hơn {scored.median_savings_pct:.0f}% median"
+        booking_url = safe_booking_url(offer.booking_url)
+        booking_line = f"   🔗 [Đặt vé]({booking_url})" if booking_url else "   🔗 Chưa có link đặt vé an toàn"
+        lines.append(
+            f"{medal} `{offer.origin} → {offer.destination}` {offer.departure_date}\n"
+            f"   *{offer.airline}* {offer.flight_number or ''}{time}\n"
+            f"   {_vnd(offer.price_per_person)}/người · Deal rất tốt (P15){savings}\n"
+            f"{booking_line}"
+        )
+    return "\n\n".join(lines)
 
 
 def format_alert_offer(offer: FlightOffer) -> str:

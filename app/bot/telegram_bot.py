@@ -14,6 +14,7 @@ from app.alerts.scheduler import AlertScheduler
 from app.alerts.service import AlertService
 from app.bot.handlers import (
     cmd_alerts,
+    cmd_deals,
     cmd_delete,
     cmd_help,
     cmd_pause,
@@ -96,6 +97,7 @@ def build_app() -> Application:
     application.add_handler(CommandHandler("search", on_text))
     application.add_handler(CommandHandler("watch", cmd_watch))
     application.add_handler(CommandHandler("alerts", cmd_alerts))
+    application.add_handler(CommandHandler("deals", cmd_deals))
     application.add_handler(CommandHandler("pause", cmd_pause))
     application.add_handler(CommandHandler("delete", cmd_delete))
     application.add_handler(CallbackQueryHandler(on_alert_callback, pattern=r"^(pause|delete):"))

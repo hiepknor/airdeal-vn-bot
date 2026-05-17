@@ -11,6 +11,7 @@ from app.alerts.service import AlertLimitReached, AlertService
 from app.bot import messages
 from app.bot.middleware.rate_limit import TokenBucketRateLimiter
 from app.db.database import upsert_user
+from app.deals.scoring import recent_great_deals
 from app.flights.providers.base import AllProvidersFailed
 from app.flights.service import FlightService
 from app.nlp.parser import parse
@@ -110,6 +111,18 @@ async def cmd_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         messages.format_alerts(alerts),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=reply_markup,
+    )
+
+
+async def cmd_deals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _check_rate_limit(update, context):
+        return
+    user = update.effective_user
+    deals = await recent_great_deals(user.id if user else None)
+    await update.message.reply_text(
+        messages.format_deals(deals),
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True,
     )
 
 

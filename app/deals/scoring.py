@@ -9,6 +9,7 @@ from app.flights.models import FlightOffer
 MIN_BASELINE_SAMPLES = 10
 BASELINE_WINDOW_DAYS = 7
 BASELINE_LOOKBACK_DAYS = 30
+RECENT_DEAL_LOOKBACK_HOURS = 24
 
 AIRLINE_TRUST = {
     "VN": 1.0,
@@ -166,6 +167,43 @@ def rank_offers(offers: list[FlightOffer], stats: Stats) -> list[ScoredOffer]:
     )
 
 
+async def recent_great_deals(telegram_id: int | None = None, limit: int = 5) -> list[ScoredOffer]:
+    watched_routes = await _watched_routes(telegram_id) if telegram_id is not None else set()
+    since = datetime.now() - timedelta(hours=RECENT_DEAL_LOOKBACK_HOURS)
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT ps.* FROM price_snapshots ps "
+            "WHERE ps.created_at >= ? "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM price_snapshots newer "
+            "  WHERE newer.flight_key = ps.flight_key "
+            "  AND newer.created_at > ps.created_at"
+            ") "
+            "ORDER BY ps.created_at DESC "
+            "LIMIT 200",
+            (since.isoformat(),),
+        )
+        rows = await cur.fetchall()
+
+    deals: list[ScoredOffer] = []
+    for row in rows:
+        offer = _offer_from_snapshot(dict(row))
+        stats = await baseline(offer.origin, offer.destination, offer.departure_date)
+        scored = score_offer(offer, stats)
+        if scored.is_great_deal:
+            deals.append(scored)
+
+    return sorted(
+        deals,
+        key=lambda item: (
+            _route_key(item.offer) not in watched_routes,
+            -item.score,
+            item.offer.price_per_person,
+            _depart_sort(item.offer),
+        ),
+    )[:limit]
+
+
 def _time_score(depart_time: str | None) -> float:
     if depart_time is None:
         return 0.5
@@ -182,3 +220,41 @@ def _airline_trust(airline: str) -> float:
 
 def _depart_sort(offer: FlightOffer) -> str:
     return offer.depart_time or "99:99"
+
+
+async def _watched_routes(telegram_id: int | None) -> set[tuple[str, str]]:
+    if telegram_id is None:
+        return set()
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT DISTINCT a.origin, a.destination FROM alerts a "
+            "JOIN users u ON u.id = a.user_id "
+            "WHERE u.telegram_id = ? AND a.active = 1",
+            (str(telegram_id),),
+        )
+        rows = await cur.fetchall()
+    return {(str(row["origin"]), str(row["destination"])) for row in rows}
+
+
+def _route_key(offer: FlightOffer) -> tuple[str, str]:
+    return (offer.origin, offer.destination)
+
+
+def _offer_from_snapshot(row: dict[str, object]) -> FlightOffer:
+    price = int(row["price_per_person"])
+    total_price = int(row["total_price"] or price)
+    return FlightOffer(
+        flight_key=str(row["flight_key"]),
+        origin=str(row["origin"]),
+        destination=str(row["destination"]),
+        departure_date=str(row["departure_date"]),
+        airline=str(row["airline"] or ""),
+        flight_number=str(row["flight_number"]) if row["flight_number"] else None,
+        depart_time=str(row["depart_time"]) if row["depart_time"] else None,
+        arrive_time=str(row["arrive_time"]) if row["arrive_time"] else None,
+        price_per_person=price,
+        total_price=total_price,
+        currency=str(row["currency"] or "VND"),
+        booking_url=str(row["booking_url"]) if row["booking_url"] else None,
+        source=str(row["source"]),
+    )

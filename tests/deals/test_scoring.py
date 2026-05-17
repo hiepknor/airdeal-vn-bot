@@ -4,8 +4,16 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.db.database import connect, init_db
-from app.deals.scoring import Stats, baseline, percentile, percentile_rank, rank_offers, score_offer
+from app.db.database import connect, init_db, upsert_user
+from app.deals.scoring import (
+    Stats,
+    baseline,
+    percentile,
+    percentile_rank,
+    rank_offers,
+    recent_great_deals,
+    score_offer,
+)
 from app.flights.models import FlightOffer
 
 
@@ -116,3 +124,66 @@ async def test_baseline_queries_route_date_window_and_recent_snapshots(isolated_
     assert stats.insufficient is False
     assert stats.count == 10
     assert stats.p50 == pytest.approx(550_000)
+
+
+async def test_recent_great_deals_returns_p15_deals_and_prioritizes_watched_routes(isolated_db):
+    await init_db()
+    await upsert_user(12345, "tester", "Test User")
+    created = datetime.now() - timedelta(hours=1)
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT id FROM users WHERE telegram_id = ?",
+            ("12345",),
+        )
+        user = await cur.fetchone()
+        await db.execute(
+            "INSERT INTO alerts("
+            "user_id, origin, destination, departure_date, trip_type, max_price_per_person"
+            ") VALUES (?, ?, ?, ?, ?, ?)",
+            (user["id"], "DAD", "SGN", "2026-06-20", "one_way", 900_000),
+        )
+        for origin, destination in [("HAN", "SGN"), ("DAD", "SGN")]:
+            for index, price in enumerate(
+                [
+                    800_000,
+                    900_000,
+                    1_000_000,
+                    1_100_000,
+                    1_200_000,
+                    1_300_000,
+                    1_400_000,
+                    1_500_000,
+                    1_600_000,
+                    1_700_000,
+                ]
+            ):
+                await db.execute(
+                    "INSERT INTO price_snapshots("
+                    "flight_key, origin, destination, departure_date, airline, flight_number, "
+                    "depart_time, arrive_time, price_per_person, total_price, currency, "
+                    "booking_url, source, created_at"
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        f"{origin}-{index}",
+                        origin,
+                        destination,
+                        "2026-06-20",
+                        "Vietnam Airlines",
+                        f"VN{index}",
+                        "08:00",
+                        "10:00",
+                        price,
+                        price,
+                        "VND",
+                        "https://atadi.vn/booking/VN123",
+                        "test",
+                        created.isoformat(),
+                    ),
+                )
+        await db.commit()
+
+    deals = await recent_great_deals(12345, limit=2)
+
+    assert len(deals) == 2
+    assert deals[0].offer.origin == "DAD"
+    assert all(deal.is_great_deal for deal in deals)
