@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     telegram_mode: str = Field("polling", alias="TELEGRAM_MODE")
     telegram_webhook_url: str | None = Field(None, alias="TELEGRAM_WEBHOOK_URL")
     telegram_webhook_secret: str | None = Field(None, alias="TELEGRAM_WEBHOOK_SECRET")
-    telegram_chat_id: int | None = Field(None, alias="TELEGRAM_CHAT_ID")
+    telegram_user_id: int | None = Field(None, alias="TELEGRAM_USER_ID")
 
     database_url: str = Field("sqlite+aiosqlite:///./data/airdeal.db", alias="DATABASE_URL")
 

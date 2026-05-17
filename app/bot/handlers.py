@@ -279,14 +279,14 @@ def _input_too_long(text: str) -> bool:
     return len(text) > MAX_INPUT_CHARS
 
 
-def _owner_allowed(user_id: int | None, owner_chat_id: int | None) -> bool:
-    return owner_chat_id is None or user_id == owner_chat_id
+def _owner_allowed(user_id: int | None, owner_user_id: int | None) -> bool:
+    return owner_user_id is None or user_id == owner_user_id
 
 
 async def _check_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user = update.effective_user
-    owner_chat_id = context.application.bot_data.get("owner_chat_id")
-    if not _owner_allowed(user.id if user else None, owner_chat_id):
+    owner_user_id = context.application.bot_data.get("owner_user_id")
+    if not _owner_allowed(user.id if user else None, owner_user_id):
         if update.callback_query:
             await update.callback_query.answer(messages.OWNER_ONLY, show_alert=False)
         elif update.message:

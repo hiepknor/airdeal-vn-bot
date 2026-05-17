@@ -90,7 +90,7 @@ def build_app() -> Application:
     notifier = TelegramAlertNotifier(application.bot)
     application.bot_data["flight_service"] = flight_service
     application.bot_data["alert_service"] = alert_service
-    application.bot_data["owner_chat_id"] = settings.telegram_chat_id
+    application.bot_data["owner_user_id"] = settings.telegram_user_id
     application.bot_data["rate_limiter"] = TokenBucketRateLimiter(settings.rate_limit_per_minute)
     application.bot_data["alert_scheduler"] = AlertScheduler(alert_service, flight_service, notifier)
 
