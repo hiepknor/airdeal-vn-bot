@@ -27,8 +27,8 @@ log = get_logger(__name__)
 
 _BASE = "https://atadi.vn/tim-ve-may-bay"
 _NAVIGATION_TIMEOUT_MS = 20_000
-_RESULT_TIMEOUT_MS = 45_000
-_SEARCH_TIMEOUT_S = 65
+_RESULT_TIMEOUT_MS = 70_000
+_SEARCH_TIMEOUT_S = 90
 _SERVICE_TIMEOUT_S = _SEARCH_TIMEOUT_S + 5
 _RESULT_SELECTOR = ".flightTicket__info"
 _VIEWPORT = {"width": 1280, "height": 900}

@@ -26,7 +26,7 @@ def test_atadi_playwright_provider_keeps_storage_state_path():
 def test_atadi_service_timeout_leaves_room_for_provider_timeout():
     provider = AtadiPlaywrightProvider()
 
-    assert provider.timeout_seconds > 65
+    assert provider.timeout_seconds > 90
 
 
 def test_map_raw_accepts_atadi_search_page_as_fallback_link():
