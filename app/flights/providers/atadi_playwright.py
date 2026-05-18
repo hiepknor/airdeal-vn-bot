@@ -33,11 +33,12 @@ _LOCALE = "vi-VN"
 
 
 @asynccontextmanager
-async def _playwright_context() -> AsyncIterator:
+async def _playwright_context(storage_state_path: str | None = None) -> AsyncIterator:
     from playwright.async_api import async_playwright
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
-        ctx = await browser.new_context(locale=_LOCALE, viewport=_VIEWPORT)
+        context_kwargs = _context_kwargs(storage_state_path)
+        ctx = await browser.new_context(locale=_LOCALE, viewport=_VIEWPORT, **context_kwargs)
         try:
             yield ctx
         finally:
@@ -45,8 +46,9 @@ async def _playwright_context() -> AsyncIterator:
 
 
 @asynccontextmanager
-async def _cloak_context() -> AsyncIterator:
+async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator:
     import cloakbrowser
+    context_kwargs = _context_kwargs(storage_state_path)
     ctx = await cloakbrowser.launch_context_async(
         headless=True,
         locale=_LOCALE,
@@ -54,6 +56,7 @@ async def _cloak_context() -> AsyncIterator:
         humanize=True,
         human_preset="default",
         stealth_args=True,
+        **context_kwargs,
     )
     try:
         yield ctx
@@ -64,9 +67,15 @@ async def _cloak_context() -> AsyncIterator:
 class AtadiPlaywrightProvider(FlightProvider):
     name = "atadi_web"
 
-    def __init__(self, affiliate_id: str | None = None, use_cloak: bool = False) -> None:
+    def __init__(
+        self,
+        affiliate_id: str | None = None,
+        use_cloak: bool = False,
+        storage_state_path: str | None = None,
+    ) -> None:
         self._affiliate_id = affiliate_id
         self._use_cloak = use_cloak
+        self._storage_state_path = storage_state_path
 
     async def search(
         self,
@@ -94,7 +103,11 @@ class AtadiPlaywrightProvider(FlightProvider):
         passengers: PassengerCount,
         return_date: str | None,
     ) -> list[FlightOffer]:
-        ctx_manager = _cloak_context() if self._use_cloak else _playwright_context()
+        ctx_manager = (
+            _cloak_context(self._storage_state_path)
+            if self._use_cloak
+            else _playwright_context(self._storage_state_path)
+        )
         backend = "CloakBrowser" if self._use_cloak else "Playwright"
 
         async with ctx_manager as ctx:
@@ -224,6 +237,12 @@ def _build_url(
         dt += "." + return_date.replace("-", "")
     ps = f"{passengers.adults}.{passengers.children}.{passengers.infants}"
     return f"{_BASE}?ap={origin}.{destination}&dt={dt}&ps={ps}&leg=0"
+
+
+def _context_kwargs(storage_state_path: str | None) -> dict[str, str]:
+    if not storage_state_path:
+        return {}
+    return {"storage_state": storage_state_path}
 
 
 _AIRLINE_CODE_MAP = {

@@ -48,6 +48,7 @@ def _build_providers() -> list[FlightProvider]:
         providers.append(AtadiPlaywrightProvider(
             affiliate_id=settings.traveloka_affiliate_id,
             use_cloak=settings.atadi_use_cloak,
+            storage_state_path=settings.atadi_storage_state_path,
         ))
         log.info("provider_enabled", name="atadi_web", cloak=settings.atadi_use_cloak)
 

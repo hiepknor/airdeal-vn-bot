@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     atadi_enabled: bool = Field(False, alias="ATADI_ENABLED")
     atadi_web_enabled: bool = Field(True, alias="ATADI_WEB_ENABLED")   # Playwright scraper
     atadi_use_cloak: bool = Field(False, alias="ATADI_USE_CLOAK")     # dùng CloakBrowser thay Playwright
+    atadi_storage_state_path: str | None = Field(None, alias="ATADI_STORAGE_STATE_PATH")
     fast_flights_enabled: bool = Field(True, alias="FAST_FLIGHTS_ENABLED")
 
     price_scan_interval_minutes: int = Field(60, alias="PRICE_SCAN_INTERVAL_MINUTES")
