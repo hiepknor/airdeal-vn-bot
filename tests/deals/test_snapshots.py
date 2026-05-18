@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.db.database import connect, init_db
 from app.deals.snapshots import record_price_snapshots
@@ -40,3 +40,23 @@ async def test_record_price_snapshots_inserts_search_results(tmp_path, monkeypat
     assert row["origin"] == "HAN"
     assert row["destination"] == "SGN"
     assert row["days_to_departure"] == 19
+
+
+async def test_record_price_snapshots_dedupes_same_offer_within_window(tmp_path, monkeypatch):
+    db_path = tmp_path / "snapshots-dedupe.db"
+    monkeypatch.setattr("app.config.settings.database_url", f"sqlite+aiosqlite:///{db_path}")
+    await init_db()
+
+    created_at = datetime(2026, 6, 1, tzinfo=UTC)
+    first = await record_price_snapshots([offer()], created_at)
+    duplicate = await record_price_snapshots([offer()], created_at + timedelta(minutes=10))
+    later = await record_price_snapshots([offer()], created_at + timedelta(minutes=31))
+
+    async with connect() as db:
+        cur = await db.execute("SELECT COUNT(*) FROM price_snapshots")
+        row = await cur.fetchone()
+
+    assert first == 1
+    assert duplicate == 0
+    assert later == 1
+    assert row[0] == 2
