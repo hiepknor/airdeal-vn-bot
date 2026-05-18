@@ -15,3 +15,9 @@ def test_atadi_playwright_provider_keeps_storage_state_path():
     provider = AtadiPlaywrightProvider(storage_state_path="/app/data/atadi_storage_state.json")
 
     assert provider._storage_state_path == "/app/data/atadi_storage_state.json"
+
+
+def test_atadi_service_timeout_leaves_room_for_provider_timeout():
+    provider = AtadiPlaywrightProvider()
+
+    assert provider.timeout_seconds > 65

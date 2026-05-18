@@ -28,6 +28,7 @@ log = get_logger(__name__)
 _BASE = "https://atadi.vn/tim-ve-may-bay"
 _TIMEOUT_MS = 20_000
 _SEARCH_TIMEOUT_S = 65
+_SERVICE_TIMEOUT_S = _SEARCH_TIMEOUT_S + 5
 _RESULT_SELECTOR = ".flightTicket__info"
 _VIEWPORT = {"width": 1280, "height": 900}
 _LOCALE = "vi-VN"
@@ -67,7 +68,7 @@ async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator
 
 class AtadiPlaywrightProvider(FlightProvider):
     name = "atadi_web"
-    timeout_seconds = _SEARCH_TIMEOUT_S
+    timeout_seconds = _SERVICE_TIMEOUT_S
 
     def __init__(
         self,

@@ -1,5 +1,6 @@
 from app.flights.models import PassengerCount
 from app.flights.providers.fast_flights_provider import (
+    _airline_name,
     _google_flights_search_url,
     _parse_price_vnd,
     _parse_time,
@@ -38,3 +39,9 @@ def test_google_flights_search_url_points_to_safe_search_page():
 
     assert url.startswith("https://www.google.com/travel/flights?")
     assert "HAN+to+VCA+2026-05-21+1+passenger" in url
+
+
+def test_airline_name_falls_back_when_google_result_is_blank():
+    assert _airline_name("") == "Chưa rõ hãng"
+    assert _airline_name(None) == "Chưa rõ hãng"
+    assert _airline_name("Vietnam Airlines · Vietjet Air") == "Vietnam Airlines"

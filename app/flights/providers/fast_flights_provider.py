@@ -155,7 +155,7 @@ class FastFlightsProvider(FlightProvider):
             return None
 
         # f.name = "Vietnam Airlines · Vietjet Air" (codeshare) hoặc "Vietjet Air"
-        airline = f.name.split("·")[0].strip()
+        airline = _airline_name(f.name)
 
         # fast_flights không có flight_number, dùng depart_time để diff
         depart_time = _parse_time(f.departure)
@@ -178,6 +178,12 @@ class FastFlightsProvider(FlightProvider):
             booking_url=booking_url,
             source=self.name,
         )
+
+
+def _airline_name(raw_name: str | None) -> str:
+    if not raw_name:
+        return "Chưa rõ hãng"
+    return raw_name.split("·")[0].strip() or "Chưa rõ hãng"
 
 
 def _google_flights_search_url(
