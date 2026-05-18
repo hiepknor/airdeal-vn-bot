@@ -27,6 +27,7 @@ log = get_logger(__name__)
 
 _BASE = "https://atadi.vn/tim-ve-may-bay"
 _TIMEOUT_MS = 20_000
+_SEARCH_TIMEOUT_S = 65
 _RESULT_SELECTOR = ".flightTicket__info"
 _VIEWPORT = {"width": 1280, "height": 900}
 _LOCALE = "vi-VN"
@@ -66,7 +67,7 @@ async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator
 
 class AtadiPlaywrightProvider(FlightProvider):
     name = "atadi_web"
-    timeout_seconds = 35
+    timeout_seconds = _SEARCH_TIMEOUT_S
 
     def __init__(
         self,
@@ -90,7 +91,7 @@ class AtadiPlaywrightProvider(FlightProvider):
         try:
             return await asyncio.wait_for(
                 self._scrape(url, origin, destination, departure_date, passengers, return_date),
-                timeout=35,
+                timeout=_SEARCH_TIMEOUT_S,
             )
         except TimeoutError as e:
             raise ProviderTimeout("atadi_web timeout") from e

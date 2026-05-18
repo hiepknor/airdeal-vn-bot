@@ -72,5 +72,5 @@ class FlightService:
                 timeout=timeout,
             )
         except Exception as e:
-            log.warning("provider_failed", provider=provider.name, error=str(e))
+            log.warning("provider_failed", provider=provider.name, error=str(e), error_type=type(e).__name__)
             raise
