@@ -1,6 +1,7 @@
 from app.flights.models import PassengerCount
 from app.flights.providers.atadi_playwright import (
     AtadiPlaywrightProvider,
+    ProviderTimeout,
     _context_kwargs,
     _goto_search_page,
     _map_raw,
@@ -75,6 +76,32 @@ async def test_new_page_recreates_broken_context(monkeypatch):
 
     assert await provider._new_page("test") == "page"
     assert isinstance(provider._context, WorkingContext)
+
+
+async def test_search_timeout_resets_context(monkeypatch):
+    provider = AtadiPlaywrightProvider()
+    reset_called = False
+
+    async def slow_scrape(*_args, **_kwargs):
+        import asyncio
+
+        await asyncio.sleep(0.01)
+        return []
+
+    async def fake_reset_context():
+        nonlocal reset_called
+        reset_called = True
+
+    monkeypatch.setattr("app.flights.providers.atadi_playwright._SEARCH_TIMEOUT_S", 0.001)
+    monkeypatch.setattr(provider, "_scrape", slow_scrape)
+    monkeypatch.setattr(provider, "_reset_context", fake_reset_context)
+
+    try:
+        await provider.search("HAN", "SGN", "2026-05-21", PassengerCount(adults=1))
+    except ProviderTimeout:
+        pass
+
+    assert reset_called is True
 
 
 def test_map_raw_accepts_atadi_search_page_as_fallback_link():

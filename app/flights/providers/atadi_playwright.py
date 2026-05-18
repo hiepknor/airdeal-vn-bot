@@ -91,6 +91,7 @@ class AtadiPlaywrightProvider(FlightProvider):
                 timeout=_SEARCH_TIMEOUT_S,
             )
         except TimeoutError as e:
+            await self._reset_context()
             raise ProviderTimeout("atadi_web timeout") from e
 
     async def close(self) -> None:
