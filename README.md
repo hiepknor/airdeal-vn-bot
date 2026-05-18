@@ -520,7 +520,7 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_MODE=polling          # polling|webhook
 TELEGRAM_WEBHOOK_URL=
-TELEGRAM_USER_ID=              # optional: owner-only Telegram user id; empty = public
+TELEGRAM_ALLOWED_USER_IDS=     # optional: comma-separated Telegram user ids; empty = public
 
 # Database
 DATABASE_URL=sqlite+aiosqlite:///./data/airdeal.db

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     telegram_mode: str = Field("polling", alias="TELEGRAM_MODE")
     telegram_webhook_url: str | None = Field(None, alias="TELEGRAM_WEBHOOK_URL")
     telegram_webhook_secret: str | None = Field(None, alias="TELEGRAM_WEBHOOK_SECRET")
-    telegram_user_id: int | None = Field(None, alias="TELEGRAM_USER_ID")
+    telegram_allowed_user_ids: str | None = Field(None, alias="TELEGRAM_ALLOWED_USER_IDS")
 
     database_url: str = Field("sqlite+aiosqlite:///./data/airdeal.db", alias="DATABASE_URL")
 
@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     @property
     def sqlite_path(self) -> str:
         return self.database_url.split("///", 1)[-1]
+
+    @property
+    def allowed_telegram_user_ids(self) -> frozenset[int] | None:
+        if not self.telegram_allowed_user_ids:
+            return None
+        user_ids = {
+            int(raw_id.strip())
+            for raw_id in self.telegram_allowed_user_ids.split(",")
+            if raw_id.strip()
+        }
+        return frozenset(user_ids) or None
 
 
 settings = Settings()  # type: ignore[call-arg]

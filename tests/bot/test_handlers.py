@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from app.bot.handlers import _input_too_long, _owner_allowed, _parse_route, parse_duration
+from app.bot.handlers import _input_too_long, _parse_route, _user_allowed, parse_duration
 
 
 def test_parse_duration_accepts_hours_and_days():
@@ -24,12 +24,13 @@ def test_parse_route_from_vietnamese_aliases():
     assert _parse_route("không rõ") is None
 
 
-def test_owner_allowed_is_public_when_chat_id_missing():
-    assert _owner_allowed(123, None) is True
-    assert _owner_allowed(None, None) is True
+def test_user_allowed_is_public_when_allowed_user_ids_missing():
+    assert _user_allowed(123, None) is True
+    assert _user_allowed(None, None) is True
 
 
-def test_owner_allowed_restricts_when_chat_id_is_set():
-    assert _owner_allowed(123, 123) is True
-    assert _owner_allowed(456, 123) is False
-    assert _owner_allowed(None, 123) is False
+def test_user_allowed_restricts_when_allowed_user_ids_is_set():
+    assert _user_allowed(123, frozenset({123, 456})) is True
+    assert _user_allowed(456, frozenset({123, 456})) is True
+    assert _user_allowed(789, frozenset({123, 456})) is False
+    assert _user_allowed(None, frozenset({123, 456})) is False
