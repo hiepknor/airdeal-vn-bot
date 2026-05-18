@@ -23,6 +23,10 @@ from app.utils.flight_key import make_flight_key
 from app.utils.logging import get_logger
 
 log = get_logger(__name__)
+_FX_TO_VND = {
+    "SGD": 20_000,
+    "USD": 26_000,
+}
 
 
 @cache
@@ -39,8 +43,33 @@ def _to_airport(iata: str) -> Airport:
 
 
 def _parse_price_vnd(price_str: str) -> int | None:
+    normalized = price_str.upper().replace("\xa0", " ")
     digits = re.sub(r"[^\d]", "", price_str)
-    return int(digits) if digits else None
+    if not digits:
+        return None
+    amount = int(digits)
+    if "VND" in normalized or "₫" in price_str or "Đ" in normalized:
+        return amount
+    for currency, rate in _FX_TO_VND.items():
+        if currency in normalized or (currency == "USD" and "$" in price_str):
+            return amount * rate
+    return amount if amount >= 100_000 else None
+
+
+def _parse_time(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = re.search(r"(\d{1,2}):(\d{2})\s*(AM|PM)?", value, flags=re.IGNORECASE)
+    if not match:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    meridiem = (match.group(3) or "").upper()
+    if meridiem == "PM" and hour != 12:
+        hour += 12
+    elif meridiem == "AM" and hour == 12:
+        hour = 0
+    return f"{hour:02d}:{minute:02d}"
 
 
 class FastFlightsProvider(FlightProvider):
@@ -121,15 +150,15 @@ class FastFlightsProvider(FlightProvider):
         return_date: str | None,
     ) -> FlightOffer | None:
         price_pp = _parse_price_vnd(f.price)
-        if not price_pp:
+        if not price_pp or price_pp < 100_000:
             return None
 
         # f.name = "Vietnam Airlines · Vietjet Air" (codeshare) hoặc "Vietjet Air"
         airline = f.name.split("·")[0].strip()
 
         # fast_flights không có flight_number, dùng depart_time để diff
-        depart_time = f.departure[:5] if f.departure else None   # "06:30 AM" → "06:30" hoặc đã là HH:MM
-        arrive_time = f.arrival[:5] if f.arrival else None
+        depart_time = _parse_time(f.departure)
+        arrive_time = _parse_time(f.arrival)
 
         return FlightOffer(
             flight_key=make_flight_key(airline[:2].upper(), None, departure_date, depart_time),
