@@ -2,6 +2,7 @@ from app.flights.models import PassengerCount
 from app.flights.providers.atadi_playwright import (
     AtadiPlaywrightProvider,
     _context_kwargs,
+    _goto_search_page,
     _map_raw,
 )
 
@@ -51,3 +52,18 @@ def test_map_raw_accepts_atadi_search_page_as_fallback_link():
     assert offer.flight_number == "QH283"
     assert offer.price_per_person == 2_178_000
     assert offer.booking_url.startswith("https://atadi.vn/tim-ve-may-bay?")
+
+
+async def test_goto_search_page_uses_commit_readiness():
+    class Page:
+        def __init__(self) -> None:
+            self.kwargs = None
+
+        async def goto(self, url: str, **kwargs):
+            self.kwargs = kwargs
+
+    page = Page()
+
+    await _goto_search_page(page, "https://atadi.vn/tim-ve-may-bay", "test")
+
+    assert page.kwargs["wait_until"] == "commit"

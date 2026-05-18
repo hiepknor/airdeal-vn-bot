@@ -26,7 +26,8 @@ from app.utils.logging import get_logger
 log = get_logger(__name__)
 
 _BASE = "https://atadi.vn/tim-ve-may-bay"
-_TIMEOUT_MS = 20_000
+_NAVIGATION_TIMEOUT_MS = 20_000
+_RESULT_TIMEOUT_MS = 45_000
 _SEARCH_TIMEOUT_S = 65
 _SERVICE_TIMEOUT_S = _SEARCH_TIMEOUT_S + 5
 _RESULT_SELECTOR = ".flightTicket__info"
@@ -116,10 +117,10 @@ class AtadiPlaywrightProvider(FlightProvider):
         async with ctx_manager as ctx:
             page = await ctx.new_page()
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=_TIMEOUT_MS)
+                await _goto_search_page(page, url, backend)
                 try:
                     from playwright.async_api import TimeoutError as PWTimeout
-                    await page.wait_for_selector(_RESULT_SELECTOR, timeout=_TIMEOUT_MS)
+                    await page.wait_for_selector(_RESULT_SELECTOR, timeout=_RESULT_TIMEOUT_MS)
                 except PWTimeout:
                     log.warning("atadi_web_no_results", url=url, backend=backend)
                     return []
@@ -145,6 +146,20 @@ class AtadiPlaywrightProvider(FlightProvider):
                 return sorted(results, key=lambda o: o.price_per_person)
             finally:
                 await page.close()
+
+
+async def _goto_search_page(page: object, url: str, backend: str) -> None:
+    try:
+        from playwright.async_api import TimeoutError as PWTimeout
+        await page.goto(url, wait_until="commit", timeout=_NAVIGATION_TIMEOUT_MS)
+    except PWTimeout as exc:
+        log.warning(
+            "atadi_web_navigation_timeout",
+            url=url,
+            backend=backend,
+            timeout_ms=_NAVIGATION_TIMEOUT_MS,
+            error=str(exc),
+        )
 
 
 # JavaScript chạy trong browser để extract flight data từ DOM
