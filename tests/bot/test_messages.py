@@ -74,3 +74,13 @@ def test_google_flights_links_are_not_labeled_as_direct_booking():
 
     assert "Mở link tìm vé" in text
     assert "Đặt vé" not in text
+
+
+def test_atadi_search_links_are_not_labeled_as_direct_booking():
+    atadi_offer = offer()
+    atadi_offer.booking_url = "https://atadi.vn/tim-ve-may-bay?ap=HAN.SGN&dt=20260521&ps=1.0.0&leg=0"
+
+    text = format_alert_offer(atadi_offer)
+
+    assert "Mở link tìm vé" in text
+    assert "Đặt vé" not in text

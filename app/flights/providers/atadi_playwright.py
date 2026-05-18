@@ -154,8 +154,9 @@ _EXTRACT_JS = """
   const tickets = document.querySelectorAll('.flightTicket__info');
   tickets.forEach(ticket => {
     try {
-      const airlineName = ticket.querySelector('.text-md.font-medium, [class*="font-medium"]')?.textContent?.trim() || '';
-      const flightNo = Array.from(ticket.querySelectorAll('.text-sm'))
+      const card = ticket.closest('.flightTicket') || ticket.closest('.flightTicket__box') || ticket.parentElement;
+      const airlineName = card?.querySelector('.flightTicket__left .text-md.font-medium, .flightTicket__left [class*="font-medium"]')?.textContent?.trim() || '';
+      const flightNo = Array.from(card?.querySelectorAll('.flightTicket__left .text-sm') || [])
         .find(el => /^[A-Z0-9]{2,3}\\d{2,4}$/.test(el.textContent?.trim()))?.textContent?.trim() || null;
 
       const timeEls = Array.from(ticket.querySelectorAll(
@@ -164,13 +165,13 @@ _EXTRACT_JS = """
       const departTime = timeEls[0]?.textContent?.trim() || null;
       const arriveTime = timeEls[1]?.textContent?.trim() || null;
 
-      const priceEl = ticket.querySelector('[class*="text-primary"], [class*="price"]')
-        || Array.from(ticket.querySelectorAll('*'))
-             .find(el => el.children.length === 0 && /\\d{1,3}(\\.\\d{3})+đ/.test(el.textContent));
+      const priceEl = card?.querySelector('[class*="text-primary"], [class*="price"], [class*="text-red"]')
+        || Array.from(card?.querySelectorAll('*') || [])
+             .find(el => el.children.length === 0 && /\\d{1,3}(\\.\\d{3})+[₫đ]/.test(el.textContent));
       const priceStr = priceEl?.textContent?.trim() || '';
 
-      const btn = ticket.closest('[class*="flight"]')?.querySelector('a[href]');
-      const bookingUrl = btn?.href || null;
+      const btn = card?.querySelector('a[href]');
+      const bookingUrl = btn?.href || location.href;
 
       if (airlineName && departTime) {
         flights.push({ airlineName, flightNo, departTime, arriveTime, priceStr, bookingUrl });

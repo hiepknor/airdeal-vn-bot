@@ -1,4 +1,9 @@
-from app.flights.providers.atadi_playwright import AtadiPlaywrightProvider, _context_kwargs
+from app.flights.models import PassengerCount
+from app.flights.providers.atadi_playwright import (
+    AtadiPlaywrightProvider,
+    _context_kwargs,
+    _map_raw,
+)
 
 
 def test_context_kwargs_omits_storage_state_when_unset():
@@ -21,3 +26,28 @@ def test_atadi_service_timeout_leaves_room_for_provider_timeout():
     provider = AtadiPlaywrightProvider()
 
     assert provider.timeout_seconds > 65
+
+
+def test_map_raw_accepts_atadi_search_page_as_fallback_link():
+    offer = _map_raw(
+        {
+            "airlineName": "Bamboo Airways",
+            "flightNo": "QH283",
+            "departTime": "22:00",
+            "arriveTime": "00:15",
+            "priceStr": "2.178.000₫ /khách",
+            "bookingUrl": "https://atadi.vn/tim-ve-may-bay?ap=HAN.SGN&dt=20260521&ps=1.0.0&leg=0",
+        },
+        "HAN",
+        "SGN",
+        "2026-05-21",
+        PassengerCount(adults=1),
+        None,
+        None,
+    )
+
+    assert offer is not None
+    assert offer.airline == "Bamboo Airways"
+    assert offer.flight_number == "QH283"
+    assert offer.price_per_person == 2_178_000
+    assert offer.booking_url.startswith("https://atadi.vn/tim-ve-may-bay?")

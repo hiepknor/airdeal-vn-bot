@@ -203,9 +203,16 @@ def _booking_line(url: str | None, indent: str = "") -> str:
     safe_url = safe_booking_url(url)
     if not safe_url:
         return f"{indent}🔗 Chưa có link đặt vé an toàn"
-    host = (urlparse(safe_url).hostname or "").lower()
-    label = "Mở link tìm vé" if host == "google.com" or host.endswith(".google.com") else "Đặt vé"
+    parsed = urlparse(safe_url)
+    host = (parsed.hostname or "").lower()
+    label = "Mở link tìm vé" if _is_search_link(host, parsed.path) else "Đặt vé"
     return f"{indent}🔗 [{label}]({safe_url})"
+
+
+def _is_search_link(host: str, path: str) -> bool:
+    if host == "google.com" or host.endswith(".google.com"):
+        return True
+    return (host == "atadi.vn" or host.endswith(".atadi.vn")) and path.startswith("/tim-ve-may-bay")
 
 
 def _deal_line(scored: ScoredOffer) -> str:
