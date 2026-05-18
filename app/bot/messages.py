@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from app.alerts.models import Alert
 from app.deals.history import RoutePriceHistory, sparkline
 from app.deals.scoring import ScoredOffer
@@ -87,8 +89,7 @@ def format_offers(offers: list[FlightOffer]) -> str:
         time = ""
         if o.depart_time and o.arrive_time:
             time = f"  {o.depart_time} → {o.arrive_time}"
-        booking_url = safe_booking_url(o.booking_url)
-        booking_line = f"   🔗 [Đặt vé]({booking_url})" if booking_url else "   🔗 Chưa có link đặt vé an toàn"
+        booking_line = _booking_line(o.booking_url, indent="   ")
         lines.append(
             f"{medal} *{o.airline}* {o.flight_number or ''}{time}\n"
             f"   {_vnd(o.price_per_person)}/người · Tổng {_vnd(o.total_price)}\n"
@@ -109,12 +110,7 @@ def format_scored_offers(scored_offers: list[ScoredOffer]) -> str:
         if o.depart_time and o.arrive_time:
             time = f"  {o.depart_time} → {o.arrive_time}"
         deal_line = _deal_line(scored)
-        booking_url = safe_booking_url(o.booking_url)
-        booking_line = (
-            f"   🔗 [Mở link tìm vé]({booking_url})"
-            if booking_url
-            else "   🔗 Chưa có link đặt vé an toàn"
-        )
+        booking_line = _booking_line(o.booking_url, indent="   ")
         lines.append(
             f"{medal} *{o.airline}* {o.flight_number or ''}{time}\n"
             f"   {_vnd(o.price_per_person)}/người · Tổng {_vnd(o.total_price)}\n"
@@ -160,8 +156,7 @@ def format_deals(deals: list[ScoredOffer]) -> str:
         savings = ""
         if scored.median_savings_pct is not None:
             savings = f" · rẻ hơn {scored.median_savings_pct:.0f}% median"
-        booking_url = safe_booking_url(offer.booking_url)
-        booking_line = f"   🔗 [Đặt vé]({booking_url})" if booking_url else "   🔗 Chưa có link đặt vé an toàn"
+        booking_line = _booking_line(offer.booking_url, indent="   ")
         lines.append(
             f"{medal} `{offer.origin} → {offer.destination}` {offer.departure_date}\n"
             f"   *{offer.airline}* {offer.flight_number or ''}{time}\n"
@@ -191,8 +186,7 @@ def format_alert_offer(offer: FlightOffer) -> str:
     time = ""
     if offer.depart_time and offer.arrive_time:
         time = f" {offer.depart_time} → {offer.arrive_time}"
-    booking_url = safe_booking_url(offer.booking_url)
-    booking_line = f"🔗 [Đặt vé]({booking_url})" if booking_url else "🔗 Chưa có link đặt vé an toàn"
+    booking_line = _booking_line(offer.booking_url)
     return (
         f"🔔 *Có vé hợp alert:* `{offer.origin} → {offer.destination}`\n"
         f"*{offer.airline}* {offer.flight_number or ''}{time}\n"
@@ -203,6 +197,15 @@ def format_alert_offer(offer: FlightOffer) -> str:
 
 def _vnd(n: int) -> str:
     return f"{n:,}đ".replace(",", ".")
+
+
+def _booking_line(url: str | None, indent: str = "") -> str:
+    safe_url = safe_booking_url(url)
+    if not safe_url:
+        return f"{indent}🔗 Chưa có link đặt vé an toàn"
+    host = (urlparse(safe_url).hostname or "").lower()
+    label = "Mở link tìm vé" if host == "google.com" or host.endswith(".google.com") else "Đặt vé"
+    return f"{indent}🔗 [{label}]({safe_url})"
 
 
 def _deal_line(scored: ScoredOffer) -> str:

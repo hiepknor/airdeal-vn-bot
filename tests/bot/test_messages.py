@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.bot.messages import format_scored_offers
+from app.bot.messages import format_alert_offer, format_scored_offers
 from app.deals.scoring import ScoredOffer, Stats
 from app.flights.models import FlightOffer
 
@@ -67,3 +67,10 @@ def test_format_scored_offers_shows_insufficient_baseline_count():
     text = format_scored_offers([scored])
 
     assert "Chưa đủ baseline (3/10 mẫu)" in text
+
+
+def test_google_flights_links_are_not_labeled_as_direct_booking():
+    text = format_alert_offer(offer())
+
+    assert "Mở link tìm vé" in text
+    assert "Đặt vé" not in text
