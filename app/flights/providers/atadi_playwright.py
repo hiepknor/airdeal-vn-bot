@@ -16,6 +16,7 @@ import asyncio
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from app.flights.models import FlightOffer, PassengerCount
 from app.flights.providers.base import FlightProvider, ProviderTimeout
@@ -33,6 +34,14 @@ _SERVICE_TIMEOUT_S = _SEARCH_TIMEOUT_S + 5
 _RESULT_SELECTOR = ".flightTicket__info"
 _VIEWPORT = {"width": 1280, "height": 900}
 _LOCALE = "vi-VN"
+_BLOCKED_RESOURCE_TYPES = {"image", "font", "media"}
+_BLOCKED_HOST_KEYWORDS = (
+    "analytics",
+    "facebook",
+    "googletagmanager",
+    "google-analytics",
+    "retagro.com",
+)
 
 
 @asynccontextmanager
@@ -117,6 +126,7 @@ class AtadiPlaywrightProvider(FlightProvider):
         async with ctx_manager as ctx:
             page = await ctx.new_page()
             try:
+                await _block_nonessential_resources(page)
                 await _goto_search_page(page, url, backend)
                 try:
                     from playwright.async_api import TimeoutError as PWTimeout
@@ -146,6 +156,24 @@ class AtadiPlaywrightProvider(FlightProvider):
                 return sorted(results, key=lambda o: o.price_per_person)
             finally:
                 await page.close()
+
+
+async def _block_nonessential_resources(page: object) -> None:
+    async def _handle(route: object) -> None:
+        request = route.request
+        if _should_block_request(request.resource_type, request.url):
+            await route.abort()
+            return
+        await route.continue_()
+
+    await page.route("**/*", _handle)
+
+
+def _should_block_request(resource_type: str, url: str) -> bool:
+    if resource_type in _BLOCKED_RESOURCE_TYPES:
+        return True
+    host = (urlparse(url).hostname or "").lower()
+    return any(keyword in host for keyword in _BLOCKED_HOST_KEYWORDS)
 
 
 async def _goto_search_page(page: object, url: str, backend: str) -> None:

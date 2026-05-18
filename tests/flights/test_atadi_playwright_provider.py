@@ -4,6 +4,7 @@ from app.flights.providers.atadi_playwright import (
     _context_kwargs,
     _goto_search_page,
     _map_raw,
+    _should_block_request,
 )
 
 
@@ -52,6 +53,14 @@ def test_map_raw_accepts_atadi_search_page_as_fallback_link():
     assert offer.flight_number == "QH283"
     assert offer.price_per_person == 2_178_000
     assert offer.booking_url.startswith("https://atadi.vn/tim-ve-may-bay?")
+
+
+def test_should_block_nonessential_atadi_resources():
+    assert _should_block_request("image", "https://cdn.atadi.vn/logo.png") is True
+    assert _should_block_request("font", "https://cdn.atadi.vn/font.woff2") is True
+    assert _should_block_request("script", "https://retagro.com/analytics?id=1") is True
+    assert _should_block_request("script", "https://cdn.atadi.vn/_next/static/chunks/app.js") is False
+    assert _should_block_request("xhr", "https://micro-services.vntrip.vn/flight-service/v1/search") is False
 
 
 async def test_goto_search_page_uses_commit_readiness():
