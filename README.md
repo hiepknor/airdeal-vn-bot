@@ -626,6 +626,11 @@ Output: deploy được, 10 beta user dùng được 1 tuần.
 Fanout 3 provider, cache, baseline percentile, affiliate ref.
 Output: bot báo "rẻ nhất" mà user mở Traveloka không tìm thấy rẻ hơn.
 
+Ghi chú triển khai:
+* Provider có booking URL thật → hiển thị `Đặt vé` sau khi validate domain.
+* Provider chỉ có dữ liệu tham khảo như FastFlights → hiển thị link tìm kiếm an toàn, không gọi là đặt vé trực tiếp.
+* Kết quả search thường cũng ghi `price_snapshots` để baseline P15/P25/P50/P75 dày lên ngoài alert worker.
+
 ### V0.3 — NLP nâng cao + Conversational UX
 LLM fallback, ConversationHandler, inline keyboard, flexible date, filter.
 Output: user gõ bất cứ gì cũng hiểu.

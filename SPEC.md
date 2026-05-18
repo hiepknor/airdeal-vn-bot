@@ -175,11 +175,17 @@ class ParsedQuery(BaseModel):
 - Đọc cache trước khi fanout. Hit → trả luôn.
 - Miss → fanout → ghi cache với `expires_at = now + SEARCH_CACHE_TTL_MINUTES`.
 - Cache hỏng (JSON parse fail) → treat as miss + xoá row.
+- V0.2: sau search thành công, bot ghi `price_snapshots` từ offers trả về để build baseline từ cả search thường lẫn alert scan.
 
 ### 4.4 Provider-specific (V0.1)
 
 **Traveloka affiliate**: API chính thức nếu được approve. Field map: `price.amount → price_per_person`.
 **Vexere/Atadi scraper**: HTML parse với BeautifulSoup. User-agent rotation từ pool. Nếu detect captcha → log + skip.
+
+### 4.5 Provider-specific (V0.2)
+
+- Provider có booking URL thật phải trả `booking_url` đã inject affiliate nếu có.
+- Provider chỉ có giá/chuyến bay, không có booking URL trực tiếp, được trả link tìm kiếm an toàn nhưng UI phải label là link tìm vé, không label là đặt vé.
 
 ---
 
