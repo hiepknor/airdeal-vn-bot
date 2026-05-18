@@ -73,6 +73,9 @@ async def _post_shutdown(application: Application) -> None:
     scheduler = application.bot_data.get("alert_scheduler")
     if scheduler:
         scheduler.shutdown()
+    flight_service = application.bot_data.get("flight_service")
+    if flight_service:
+        await flight_service.close()
 
 
 def build_app() -> Application:

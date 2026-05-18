@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 
 from app.flights.models import FlightOffer, PassengerCount
 from app.flights.providers.base import FlightProvider, ProviderTimeout
@@ -35,24 +33,21 @@ _VIEWPORT = {"width": 1280, "height": 900}
 _LOCALE = "vi-VN"
 
 
-@asynccontextmanager
-async def _playwright_context(storage_state_path: str | None = None) -> AsyncIterator:
+async def _new_playwright_context(storage_state_path: str | None = None) -> tuple[object, object, object]:
     from playwright.async_api import async_playwright
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        context_kwargs = _context_kwargs(storage_state_path)
-        ctx = await browser.new_context(locale=_LOCALE, viewport=_VIEWPORT, **context_kwargs)
-        try:
-            yield ctx
-        finally:
-            await browser.close()
 
-
-@asynccontextmanager
-async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator:
-    import cloakbrowser
+    pw = await async_playwright().start()
+    browser = await pw.chromium.launch(headless=True)
     context_kwargs = _context_kwargs(storage_state_path)
-    ctx = await cloakbrowser.launch_context_async(
+    ctx = await browser.new_context(locale=_LOCALE, viewport=_VIEWPORT, **context_kwargs)
+    return pw, browser, ctx
+
+
+async def _new_cloak_context(storage_state_path: str | None = None) -> object:
+    import cloakbrowser
+
+    context_kwargs = _context_kwargs(storage_state_path)
+    return await cloakbrowser.launch_context_async(
         headless=True,
         locale=_LOCALE,
         viewport=_VIEWPORT,
@@ -61,10 +56,6 @@ async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator
         stealth_args=True,
         **context_kwargs,
     )
-    try:
-        yield ctx
-    finally:
-        await ctx.close()
 
 
 class AtadiPlaywrightProvider(FlightProvider):
@@ -80,6 +71,10 @@ class AtadiPlaywrightProvider(FlightProvider):
         self._affiliate_id = affiliate_id
         self._use_cloak = use_cloak
         self._storage_state_path = storage_state_path
+        self._context_lock = asyncio.Lock()
+        self._playwright: object | None = None
+        self._browser: object | None = None
+        self._context: object | None = None
 
     async def search(
         self,
@@ -98,6 +93,10 @@ class AtadiPlaywrightProvider(FlightProvider):
         except TimeoutError as e:
             raise ProviderTimeout("atadi_web timeout") from e
 
+    async def close(self) -> None:
+        async with self._context_lock:
+            await self._close_context_locked()
+
     async def _scrape(
         self,
         url: str,
@@ -107,45 +106,96 @@ class AtadiPlaywrightProvider(FlightProvider):
         passengers: PassengerCount,
         return_date: str | None,
     ) -> list[FlightOffer]:
-        ctx_manager = (
-            _cloak_context(self._storage_state_path)
-            if self._use_cloak
-            else _playwright_context(self._storage_state_path)
-        )
         backend = "CloakBrowser" if self._use_cloak else "Playwright"
-
-        async with ctx_manager as ctx:
-            page = await ctx.new_page()
+        page = await self._new_page(backend)
+        try:
+            await _goto_search_page(page, url, backend)
             try:
-                await _goto_search_page(page, url, backend)
-                try:
-                    from playwright.async_api import TimeoutError as PWTimeout
-                    await page.wait_for_selector(_RESULT_SELECTOR, timeout=_RESULT_TIMEOUT_MS)
-                except PWTimeout:
-                    log.warning("atadi_web_no_results", url=url, backend=backend)
-                    return []
+                from playwright.async_api import TimeoutError as PWTimeout
+                await page.wait_for_selector(_RESULT_SELECTOR, timeout=_RESULT_TIMEOUT_MS)
+            except PWTimeout:
+                log.warning("atadi_web_no_results", url=url, backend=backend)
+                return []
 
-                offers = await page.evaluate(_EXTRACT_JS)
-                results: list[FlightOffer] = []
-                for raw in offers:
-                    offer = _map_raw(
-                        raw, origin, destination, departure_date,
-                        passengers, return_date, self._affiliate_id,
-                    )
-                    if offer:
-                        results.append(offer)
-
-                log.info(
-                    "atadi_web_done",
-                    origin=origin,
-                    destination=destination,
-                    date=departure_date,
-                    count=len(results),
-                    backend=backend,
+            offers = await page.evaluate(_EXTRACT_JS)
+            results: list[FlightOffer] = []
+            for raw in offers:
+                offer = _map_raw(
+                    raw, origin, destination, departure_date,
+                    passengers, return_date, self._affiliate_id,
                 )
-                return sorted(results, key=lambda o: o.price_per_person)
-            finally:
-                await page.close()
+                if offer:
+                    results.append(offer)
+
+            log.info(
+                "atadi_web_done",
+                origin=origin,
+                destination=destination,
+                date=departure_date,
+                count=len(results),
+                backend=backend,
+            )
+            return sorted(results, key=lambda o: o.price_per_person)
+        except Exception:
+            await self._reset_context()
+            raise
+        finally:
+            await _safe_close(page)
+
+    async def _new_page(self, backend: str) -> object:
+        for attempt in range(2):
+            ctx = await self._ensure_context(backend)
+            try:
+                return await ctx.new_page()
+            except Exception as exc:
+                await self._reset_context()
+                if attempt == 1:
+                    raise
+                log.warning("atadi_web_context_recreated", backend=backend, error=str(exc))
+        raise RuntimeError("unable to open Atadi page")
+
+    async def _ensure_context(self, backend: str) -> object:
+        async with self._context_lock:
+            if self._context is not None:
+                return self._context
+
+            if self._use_cloak:
+                self._context = await _new_cloak_context(self._storage_state_path)
+            else:
+                self._playwright, self._browser, self._context = await _new_playwright_context(
+                    self._storage_state_path
+                )
+            log.info("atadi_web_context_ready", backend=backend)
+            return self._context
+
+    async def _reset_context(self) -> None:
+        async with self._context_lock:
+            await self._close_context_locked()
+
+    async def _close_context_locked(self) -> None:
+        context = self._context
+        browser = self._browser
+        playwright = self._playwright
+        self._context = None
+        self._browser = None
+        self._playwright = None
+
+        await _safe_close(context)
+        await _safe_close(browser)
+        if playwright is not None:
+            try:
+                await playwright.stop()
+            except Exception as exc:
+                log.warning("atadi_web_playwright_stop_failed", error=str(exc))
+
+
+async def _safe_close(target: object | None) -> None:
+    if target is None:
+        return
+    try:
+        await target.close()
+    except Exception as exc:
+        log.warning("atadi_web_close_failed", error=str(exc))
 
 
 async def _goto_search_page(page: object, url: str, backend: str) -> None:

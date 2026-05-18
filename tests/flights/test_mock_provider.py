@@ -60,6 +60,24 @@ async def test_service_uses_provider_specific_timeout():
     assert offers[0].source == "slow"
 
 
+@pytest.mark.asyncio
+async def test_service_close_closes_providers():
+    class CloseableProvider(MockProvider):
+        def __init__(self) -> None:
+            super().__init__()
+            self.closed = False
+
+        async def close(self) -> None:
+            self.closed = True
+
+    provider = CloseableProvider()
+    svc = FlightService([provider])
+
+    await svc.close()
+
+    assert provider.closed is True
+
+
 def _offer(
     *,
     price: int,

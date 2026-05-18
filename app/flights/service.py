@@ -21,6 +21,12 @@ class FlightService:
         self.providers = providers
         self.cache = cache
 
+    async def close(self) -> None:
+        for provider in self.providers:
+            close = getattr(provider, "close", None)
+            if close is not None:
+                await close()
+
     async def search(
         self,
         origin: str,

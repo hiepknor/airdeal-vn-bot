@@ -29,6 +29,54 @@ def test_atadi_service_timeout_leaves_room_for_provider_timeout():
     assert provider.timeout_seconds > 90
 
 
+async def test_new_page_reuses_existing_context():
+    class Context:
+        def __init__(self) -> None:
+            self.new_page_calls = 0
+
+        async def new_page(self):
+            self.new_page_calls += 1
+            return object()
+
+    provider = AtadiPlaywrightProvider()
+    context = Context()
+    provider._context = context
+
+    page_one = await provider._new_page("test")
+    page_two = await provider._new_page("test")
+
+    assert page_one is not page_two
+    assert context.new_page_calls == 2
+    assert provider._context is context
+
+
+async def test_new_page_recreates_broken_context(monkeypatch):
+    class BrokenContext:
+        async def new_page(self):
+            raise RuntimeError("closed")
+
+        async def close(self) -> None:
+            pass
+
+    class WorkingContext:
+        async def new_page(self):
+            return "page"
+
+    contexts = [BrokenContext(), WorkingContext()]
+
+    async def fake_new_cloak_context(storage_state_path):
+        return contexts.pop(0)
+
+    monkeypatch.setattr(
+        "app.flights.providers.atadi_playwright._new_cloak_context",
+        fake_new_cloak_context,
+    )
+    provider = AtadiPlaywrightProvider(use_cloak=True)
+
+    assert await provider._new_page("test") == "page"
+    assert isinstance(provider._context, WorkingContext)
+
+
 def test_map_raw_accepts_atadi_search_page_as_fallback_link():
     offer = _map_raw(
         {
