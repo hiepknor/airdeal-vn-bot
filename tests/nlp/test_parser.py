@@ -27,6 +27,16 @@ def test_parse_round_trip():
     assert q.passengers.children == 1
 
 
+def test_parse_round_trip_when_departure_and_return_are_same_day():
+    q = parse("hà nội đi đà nẵng ngày đi 25/6 ngày về 25/6 1 người", TODAY)
+
+    assert q.origin == "HAN"
+    assert q.destination == "DAD"
+    assert q.departure_date == date(2026, 6, 25)
+    assert q.return_date == date(2026, 6, 25)
+    assert q.trip_type == "round_trip"
+
+
 def test_parse_relative_date():
     q = parse("mai bay sài gòn", TODAY)
     assert q.destination == "SGN"

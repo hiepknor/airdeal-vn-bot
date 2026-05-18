@@ -29,6 +29,11 @@ _DATE_TOKEN_RE = re.compile(
     r"\d{1,2}\s*[/\-]\s*\d{1,2}(?:\s*[/\-]\s*\d{2,4})?|\d{1,2}\s+tháng\s+\d{1,2}(?:\s+\d{4})?",
     re.IGNORECASE,
 )
+_LABELLED_DATE_RE = re.compile(
+    rf"(?:ngày|ngay)?\s*(?P<label>đi|di|bay|về|ve)\s*"
+    rf"(?:ngày|ngay)?\s*(?P<date>{_DATE_TOKEN_RE.pattern})",
+    re.IGNORECASE,
+)
 
 _RELATIVE_PHRASES = [
     "hôm nay", "tối nay", "ngày mai", "mai", "ngày mốt", "mốt", "ngày kia", "kia",
@@ -60,6 +65,7 @@ def parse(text: str, today: date | None = None) -> ParsedQuery:
     elif len(airports) == 1:
         result.destination = airports[0][2]
 
+    labelled_departure, labelled_return = _extract_labelled_dates(t, today)
     dates: list[date] = []
     for m in _DATE_TOKEN_RE.finditer(t):
         d = parse_explicit(m.group(0), today)
@@ -76,13 +82,17 @@ def parse(text: str, today: date | None = None) -> ParsedQuery:
             t = t.replace(phrase, " ", 1)
 
     dates = sorted(set(dates))
-    if dates:
-        result.departure_date = dates[0]
-    if len(dates) >= 2:
-        result.return_date = dates[1]
+    if labelled_departure and labelled_return:
+        result.departure_date = labelled_departure
+        result.return_date = labelled_return
         result.trip_type = "round_trip"
-    elif result.departure_date:
-        result.trip_type = "one_way"
+    elif dates:
+        result.departure_date = dates[0]
+        if len(dates) >= 2:
+            result.return_date = dates[1]
+            result.trip_type = "round_trip"
+        else:
+            result.trip_type = "one_way"
 
     result.passengers = _parse_passengers(t)
 
@@ -105,6 +115,21 @@ def parse(text: str, today: date | None = None) -> ParsedQuery:
         result.intent = "search_cheapest"
 
     return result
+
+
+def _extract_labelled_dates(t: str, today: date | None) -> tuple[date | None, date | None]:
+    departure_date: date | None = None
+    return_date: date | None = None
+    for match in _LABELLED_DATE_RE.finditer(t):
+        parsed = parse_explicit(match.group("date"), today)
+        if parsed is None:
+            continue
+        label = match.group("label")
+        if label in ("về", "ve"):
+            return_date = return_date or parsed
+        else:
+            departure_date = departure_date or parsed
+    return departure_date, return_date
 
 
 _PAX_RE = re.compile(r"(\d+)\s*(người|nguoi|khách|khach|vé|ve|pax|vc|vợ chồng|vo chong)")
