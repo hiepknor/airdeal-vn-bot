@@ -150,6 +150,8 @@ class ParsedQuery(BaseModel):
 - Input toàn emoji / quá ngắn (< 4 char) → `intent=unknown, confidence=0`.
 - Input > 500 char → reject (rate limit + DoS guard).
 - Sai chính tả phổ biến: `"sai gon"`, `"saigon"`, `"hà nôi"`, `"danang"` — đều phải match.
+- Nếu input có cả label ngày đi (`đi` / `di` / `bay`) và ngày về (`về` / `ve`) → parse `trip_type=round_trip`, giữ đúng `departure_date` và `return_date` theo label.
+- Nếu ngày đi và ngày về trùng nhau nhưng có đủ label `đi/về` → vẫn parse là khứ hồi cùng ngày, không gộp thành one-way.
 - Hai date xuất hiện không có `đi/về` → assume round_trip, smaller=departure, larger=return.
 
 ---
