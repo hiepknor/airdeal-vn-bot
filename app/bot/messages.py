@@ -97,6 +97,33 @@ def format_offers(offers: list[FlightOffer]) -> str:
     return "\n\n".join(lines)
 
 
+def format_scored_offers(scored_offers: list[ScoredOffer]) -> str:
+    if not scored_offers:
+        return NO_RESULTS
+    medals = ["🥇", "🥈", "🥉", "•", "•"]
+    lines: list[str] = []
+    for i, scored in enumerate(scored_offers[:5]):
+        o = scored.offer
+        medal = medals[i] if i < len(medals) else "•"
+        time = ""
+        if o.depart_time and o.arrive_time:
+            time = f"  {o.depart_time} → {o.arrive_time}"
+        deal_line = _deal_line(scored)
+        booking_url = safe_booking_url(o.booking_url)
+        booking_line = (
+            f"   🔗 [Mở link tìm vé]({booking_url})"
+            if booking_url
+            else "   🔗 Chưa có link đặt vé an toàn"
+        )
+        lines.append(
+            f"{medal} *{o.airline}* {o.flight_number or ''}{time}\n"
+            f"   {_vnd(o.price_per_person)}/người · Tổng {_vnd(o.total_price)}\n"
+            f"{deal_line}\n"
+            f"{booking_line}"
+        )
+    return "\n\n".join(lines)
+
+
 def format_watch_confirm(alert: Alert) -> str:
     return (
         f"✅ Đã tạo alert #{alert.id}\n"
@@ -176,3 +203,13 @@ def format_alert_offer(offer: FlightOffer) -> str:
 
 def _vnd(n: int) -> str:
     return f"{n:,}đ".replace(",", ".")
+
+
+def _deal_line(scored: ScoredOffer) -> str:
+    if scored.baseline.insufficient:
+        return f"   📊 Chưa đủ baseline ({scored.baseline.count}/10 mẫu)"
+    label = "⭐ DEAL RẤT TỐT (P15)" if scored.is_great_deal else "👍 DEAL (P25)" if scored.is_deal else "📊 Giá tham khảo"
+    savings = ""
+    if scored.median_savings_pct is not None:
+        savings = f" · rẻ hơn {scored.median_savings_pct:.0f}% median"
+    return f"   {label}{savings}"

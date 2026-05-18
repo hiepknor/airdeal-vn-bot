@@ -12,7 +12,8 @@ from app.bot import messages
 from app.bot.middleware.rate_limit import TokenBucketRateLimiter
 from app.db.database import upsert_user
 from app.deals.history import route_price_history
-from app.deals.scoring import recent_great_deals
+from app.deals.scoring import baseline, rank_offers, recent_great_deals
+from app.deals.snapshots import record_price_snapshots
 from app.flights.providers.base import AllProvidersFailed
 from app.flights.service import FlightService
 from app.nlp.airport_aliases import find_airports
@@ -236,8 +237,15 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(messages.PROVIDER_FAIL)
         return
 
+    stats = await baseline(q.origin, q.destination, q.departure_date.isoformat())
+    ranked = rank_offers(offers, stats)
+    try:
+        await record_price_snapshots(offers)
+    except Exception as e:
+        log.warning("search_snapshot_record_failed", error=str(e), error_type=type(e).__name__)
+
     await update.message.reply_text(
-        messages.format_offers(offers),
+        messages.format_scored_offers(ranked),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )

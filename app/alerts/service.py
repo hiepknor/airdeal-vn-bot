@@ -7,6 +7,7 @@ from app.alerts.models import Alert
 from app.config import settings
 from app.db.database import connect
 from app.deals.scoring import baseline, score_offer
+from app.deals.snapshots import record_price_snapshots
 from app.flights.models import FlightOffer, PassengerCount
 from app.utils.logging import get_logger
 
@@ -220,36 +221,7 @@ class AlertService:
         offer: FlightOffer,
         created_at: datetime | None = None,
     ) -> None:
-        created = created_at or _now()
-        days_to_departure = (
-            datetime.fromisoformat(offer.departure_date).date() - created.date()
-        ).days
-        async with connect() as db:
-            await db.execute(
-                "INSERT INTO price_snapshots("
-                "flight_key, origin, destination, departure_date, airline, flight_number, "
-                "depart_time, arrive_time, price_per_person, total_price, currency, "
-                "booking_url, source, days_to_departure, created_at"
-                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    offer.flight_key,
-                    offer.origin,
-                    offer.destination,
-                    offer.departure_date,
-                    offer.airline,
-                    offer.flight_number,
-                    offer.depart_time,
-                    offer.arrive_time,
-                    offer.price_per_person,
-                    offer.total_price,
-                    offer.currency,
-                    offer.booking_url,
-                    offer.source,
-                    days_to_departure,
-                    created.isoformat(),
-                ),
-            )
-            await db.commit()
+        await record_price_snapshots([offer], created_at)
 
     async def recent_snapshots(
         self,
