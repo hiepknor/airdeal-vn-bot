@@ -1,6 +1,7 @@
 import pytest
 
 from app.flights.models import FlightOffer, PassengerCount
+from app.flights.providers.base import AllProvidersFailed
 from app.flights.providers.mock import MockProvider
 from app.flights.service import FlightService
 
@@ -76,6 +77,63 @@ async def test_service_close_closes_providers():
     await svc.close()
 
     assert provider.closed is True
+
+
+@pytest.mark.asyncio
+async def test_service_logs_provider_success_metrics(monkeypatch):
+    events = []
+
+    class Logger:
+        def info(self, event, **kwargs):
+            events.append((event, kwargs))
+
+        def warning(self, event, **kwargs):
+            events.append((event, kwargs))
+
+    monkeypatch.setattr("app.flights.service.log", Logger())
+    svc = FlightService([MockProvider()])
+
+    await svc.search("HAN", "SGN", "2026-05-20", PassengerCount(adults=1))
+
+    event, fields = events[0]
+    assert event == "provider_done"
+    assert fields["provider"] == "mock"
+    assert fields["status"] == "ok"
+    assert fields["offer_count"] >= 1
+    assert fields["duration_ms"] >= 0
+    assert fields["origin"] == "HAN"
+    assert fields["destination"] == "SGN"
+
+
+@pytest.mark.asyncio
+async def test_service_logs_provider_failure_metrics(monkeypatch):
+    events = []
+
+    class Logger:
+        def info(self, event, **kwargs):
+            events.append((event, kwargs))
+
+        def warning(self, event, **kwargs):
+            events.append((event, kwargs))
+
+    class FailingProvider:
+        name = "failing"
+
+        async def search(self, *_args, **_kwargs):
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr("app.flights.service.log", Logger())
+    svc = FlightService([FailingProvider()])
+
+    with pytest.raises(AllProvidersFailed):
+        await svc.search("HAN", "SGN", "2026-05-20", PassengerCount(adults=1))
+
+    event, fields = events[0]
+    assert event == "provider_failed"
+    assert fields["provider"] == "failing"
+    assert fields["status"] == "error"
+    assert fields["error_type"] == "RuntimeError"
+    assert fields["duration_ms"] >= 0
 
 
 def _offer(

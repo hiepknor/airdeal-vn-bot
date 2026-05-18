@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from urllib.parse import urlparse
 
 from app.flights.cache import SearchCache
@@ -77,14 +78,40 @@ class FlightService:
         passengers: PassengerCount,
         return_date: str | None,
     ) -> list[FlightOffer]:
+        started = time.perf_counter()
+        timeout = getattr(provider, "timeout_seconds", _PROVIDER_TIMEOUT_S)
         try:
-            timeout = getattr(provider, "timeout_seconds", _PROVIDER_TIMEOUT_S)
-            return await asyncio.wait_for(
+            offers = await asyncio.wait_for(
                 provider.search(origin, destination, departure_date, passengers, return_date),
                 timeout=timeout,
             )
+            log.info(
+                "provider_done",
+                provider=provider.name,
+                status="ok",
+                duration_ms=_elapsed_ms(started),
+                offer_count=len(offers),
+                origin=origin,
+                destination=destination,
+                departure_date=departure_date,
+                return_date=return_date,
+                timeout_seconds=timeout,
+            )
+            return offers
         except Exception as e:
-            log.warning("provider_failed", provider=provider.name, error=str(e), error_type=type(e).__name__)
+            log.warning(
+                "provider_failed",
+                provider=provider.name,
+                status="error",
+                duration_ms=_elapsed_ms(started),
+                origin=origin,
+                destination=destination,
+                departure_date=departure_date,
+                return_date=return_date,
+                timeout_seconds=timeout,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise
 
 
@@ -110,3 +137,7 @@ def _is_direct_booking_url(url: str | None) -> bool:
         return False
     host = (urlparse(safe_url).hostname or "").lower()
     return not (host == "google.com" or host.endswith(".google.com"))
+
+
+def _elapsed_ms(started: float) -> int:
+    return round((time.perf_counter() - started) * 1000)
