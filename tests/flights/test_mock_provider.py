@@ -1,6 +1,6 @@
 import pytest
 
-from app.flights.models import PassengerCount
+from app.flights.models import FlightOffer, PassengerCount
 from app.flights.providers.mock import MockProvider
 from app.flights.service import FlightService
 
@@ -28,3 +28,33 @@ async def test_service_sorts_by_price():
     offers = await svc.search("HAN", "SGN", "2026-05-20", PassengerCount(adults=1))
     prices = [o.price_per_person for o in offers]
     assert prices == sorted(prices)
+
+
+class SlowProvider:
+    name = "slow"
+    timeout_seconds = 0.2
+
+    async def search(self, *_args, **_kwargs):
+        import asyncio
+
+        await asyncio.sleep(0.05)
+        return [
+            FlightOffer(
+                flight_key="slow",
+                origin="HAN",
+                destination="SGN",
+                departure_date="2026-05-20",
+                airline="Test Air",
+                price_per_person=1_000_000,
+                total_price=1_000_000,
+                source=self.name,
+            )
+        ]
+
+
+@pytest.mark.asyncio
+async def test_service_uses_provider_specific_timeout():
+    svc = FlightService([SlowProvider()])
+    offers = await svc.search("HAN", "SGN", "2026-05-20", PassengerCount(adults=1))
+
+    assert offers[0].source == "slow"

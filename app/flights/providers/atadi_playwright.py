@@ -66,6 +66,7 @@ async def _cloak_context(storage_state_path: str | None = None) -> AsyncIterator
 
 class AtadiPlaywrightProvider(FlightProvider):
     name = "atadi_web"
+    timeout_seconds = 35
 
     def __init__(
         self,

@@ -66,9 +66,10 @@ class FlightService:
         return_date: str | None,
     ) -> list[FlightOffer]:
         try:
+            timeout = getattr(provider, "timeout_seconds", _PROVIDER_TIMEOUT_S)
             return await asyncio.wait_for(
                 provider.search(origin, destination, departure_date, passengers, return_date),
-                timeout=_PROVIDER_TIMEOUT_S,
+                timeout=timeout,
             )
         except Exception as e:
             log.warning("provider_failed", provider=provider.name, error=str(e))
