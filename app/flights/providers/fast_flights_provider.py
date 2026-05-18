@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import re
 from functools import cache
+from urllib.parse import urlencode
 
 from fast_flights import Airport, FlightData, Passengers, get_flights
 from fast_flights.schema import Flight as FFLight
@@ -160,6 +161,8 @@ class FastFlightsProvider(FlightProvider):
         depart_time = _parse_time(f.departure)
         arrive_time = _parse_time(f.arrival)
 
+        booking_url = _google_flights_search_url(origin, destination, departure_date, passengers, return_date)
+
         return FlightOffer(
             flight_key=make_flight_key(airline[:2].upper(), None, departure_date, depart_time),
             origin=origin,
@@ -172,6 +175,24 @@ class FastFlightsProvider(FlightProvider):
             arrive_time=arrive_time,
             price_per_person=price_pp,
             total_price=price_pp * passengers.total,
-            booking_url=None,
+            booking_url=booking_url,
             source=self.name,
         )
+
+
+def _google_flights_search_url(
+    origin: str,
+    destination: str,
+    departure_date: str,
+    passengers: PassengerCount,
+    return_date: str | None,
+) -> str:
+    params = {
+        "q": (
+            f"{origin} to {destination} {departure_date} "
+            f"{passengers.total} passenger{'s' if passengers.total != 1 else ''}"
+        )
+    }
+    if return_date:
+        params["q"] += f" return {return_date}"
+    return f"https://www.google.com/travel/flights?{urlencode(params)}"
